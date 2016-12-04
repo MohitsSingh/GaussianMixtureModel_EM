@@ -28,13 +28,10 @@ function [ws,mus,sigmas] = MixMLE1(xs,m,e)
     %Eステップ
     for i=1:n
       x = xs(:,i);
-      temp = 0;
-      for j=1:m
-        eta(i,j) = ws(j) * N(x,mus(:,j),sigmas(:,:,j));
-        temp = temp + eta(i,j);
-      end
-      eta(i,:) = eta(i,:) ./ temp;
+      eta(i,:) = (ws .* mvnpdf(repmat(x,[1,m])',mus',sigmas))';
+      eta(i,:) = eta(i,:) ./ sum(eta(i,:),2);
     end
+    
     
     %収束判定
     diff = sum(sum(~((eta - lasteta) < e)))
@@ -69,26 +66,4 @@ function [ws,mus,sigmas] = MixMLE1(xs,m,e)
     temp11 = permute(temp11,[2,3,1]);%d*d*m
     sigmas = sigmas ./ temp11;%d*d*m
   end
-end
-
-%モデルqにおける確率を計算して返す関数
-%ax = d*1
-%mu = d*m
-%sigma = d*d*m
-function y = q(ax,ws,mus,sigmas)
-  [m d] = size(mus);
-  y=0;
-  for j=1:m
-    y = y + ws(j) * N(ax,mus(:,j),sigmas(:,:,j));
-  end
-end
-
-%正規分布の確率を返す関数
-%ax = d*1
-%mu = d*1
-%sigma = d*d
-function y = N(ax,mu,sigma)
-  d = size(ax);
-  d = d(1);
-  y= 1 / ( (2 * pi)^(d/2) * det(sigma)^(1/2)) * exp(-1/2 * (ax-mu)' * pinv(sigma) * (ax-mu));
 end
