@@ -1,15 +1,15 @@
-
-%混合ガウスモデルに対して最尤推定を行う
-%与えられた標本、混合数に対して最適なパラメータを返す
-%xs n*d行列 各行にd次元標本が入っている
-%m 混合数
-%e 収束判定に使う正数 etaの差がこれより小さくなったら終了する
+%ガウス混合モデルに対して最尤推定を行い最適なパラメータを返す関数
+%引数
+% xs d*n行列 各行にd次元標本が入っている
+% m 混合数
+% e 収束判定に使う正数 etaの差がこれより小さくなったら終了する
 %返り値
-%ws = m * 1 の列ベクトル
-%mus = m*d の行列 muの行ベクトルが並んでいる
-%sigmas = d*d*n covがn枚並んでいる
+% ws = m * 1 の列ベクトル
+% mus = d*m の行列 muの行ベクトルが並んでいる
+% sigmas = d*d*n 分散共分散行列がn枚並んでいる
+%グラフの描画あり
 function [ws,mus,sigmas] = MixMLE(xs,m,e)
-  [n,d] = size(xs);
+  [d,n] = size(xs);
   %初期値設定
   ws = zeros(m,1);
   gamma = rand(m,1);
@@ -19,148 +19,100 @@ function [ws,mus,sigmas] = MixMLE(xs,m,e)
     gsum = gsum + ws(j);
   end
   ws = ws ./ gsum;
-  mus = rand(m,d);
+  mus = rand(d,m);
   sigmas = rand(d,d,m);
-  %pause;
-  
   eta = zeros(n,m);
-  lasteta = zeros(n,m);
   
-  count = 0;
-  lastL = 0;
+  drawfreq = 5;
+  count = drawfreq;
+  h1 = figure;
   while 1
+    count = count + 1;
     lasteta = eta;
     %Eステップ
     for i=1:n
-      x = xs(i,:)';
-      %temp = q(x,ws,mus,sigmas);
+      x = xs(:,i);
       temp = 0;
       for j=1:m
-        eta(i,j) = ws(j) * N(x,mus(j,:)',sigmas(:,:,j));
+        eta(i,j) = ws(j) * N(x,mus(:,j),sigmas(:,:,j));
         temp = temp + eta(i,j);
-        %eta(i,j) = ws(j) * N(x,mus(j,:)',sigmas(j,:,:)) / temp;
       end
       eta(i,:) = eta(i,:) ./ temp;
     end
     
-    %差分計算
-    deta = lasteta - eta;
-    diff = 0;
-    for i=1:n
-      for j=1:m
-        diff = diff + abs(deta(i,j));
+    %収束判定
+    diff = sum(sum(~((eta - lasteta) < e)))
+    if diff == 0
+      break;
+    end
+    
+    %drawfreq回に１回グラフを描画
+    if  drawfreq < count
+      count = 0;
+      x = -10:0.5:10;
+      xc = size(x);
+      xc = xc(2);
+      y1 = zeros(1,xc);
+      y2 = zeros(1,xc);
+      y3 = zeros(1,xc);
+      y4 = zeros(1,xc);
+      for xi = 1:xc
+        y1(1,xi) = ws(1)*N(x(:,xi),mus(:,1),sigmas(:,:,1));
+        y2(1,xi) = ws(2)*N(x(:,xi),mus(:,2),sigmas(:,:,2));
+        y3(1,xi) = ws(3)*N(x(:,xi),mus(:,3),sigmas(:,:,3));
+        y4(1,xi) = y1(1,xi) + y2(1,xi) +y3(1,xi);
       end
+      plot(x,y1,x,y2,x,y3,x,y4);
+      title('計算過程')
+      drawnow
     end
-    %deta = deta .* deta;
-    %diff = sum(sum(deta));
-    diff
-    if diff < e
-      return
-    end
-    %diff = sum(sum(~((eta - lasteta) < 0.001)))
-    %if diff == 0
-    %  return
-    %end
     
     %Mステップ
-    %temp = m * 1 行列
     temp = (sum(eta))';
-    
     %重みの計算
     ws = temp ./ n;
-    
     %平均の計算
-    temp1 = repmat(eta,[1,1,d]);
-    temp1 = permute(temp1,[2,3,1]);
-    temp2 = repmat(xs,[1,1,m]);
-    temp2 = permute(temp2,[3,2,1]);
-    
-    mus = sum((temp1.*temp2),3);
-    mus = mus ./ (repmat(temp,[1,d]));
-    
-    
-    %Compute Sigma
-    temp3 = repmat(xs,[1,1,m]);
-    temp3 = permute(temp3,[1,3,2]);
-    temp4 = repmat(mus,[1,1,n]);
-    temp4 = permute(temp4,[3,1,2]);
-    
-    %y = n*m*d 行列
-    temp5 = temp3 - temp4;
-    
-    temp6 = repmat(temp5,[1,1,1,d]);
-    temp7 = permute(temp6,[1,2,4,3]);
-    
-    %Y = n*m*d*d行列
-    %This is Y n*m*d*d
-    temp8 = temp6 .* temp7;
-    temp10 = repmat(eta,[1,1,d,d]);
-    
-    %simgas = m * d* d 
-    sigmas = squeeze(sum((temp8.*temp10),1));
-    temp11 = (repmat(temp,[1,d,d]));
-    sigmas = sigmas ./ temp11;
-    
-    %sigmas <- d * d * n
-    sigmas = permute(sigmas,[2,3,1]);
-    
-    sigmas
-    pause;
-    for j=1:m
-    %  temp = sum(eta(:,j));
-      %ws(j) = temp/n;
-      
-      %musum = zeros(1,d);
-      %for i=1:n
-      %  musum = musum + eta(i,j) * xs(i,:);
-      %end
-      %musum = musum + diff*0.01 * rand(1,d)-0.5*ones(1,d);
-      %mus(j,:) = musum ./ temp;
-      
-    %  sigmasum = zeros(d,d);
-    %  for i=1:n
-    %    xmu = xs(i,:) - mus(j);
-    %    sigmasum = sigmasum + eta(i,j) * xmu' * xmu;
-    %  end
-    %  sigmasum = sigmasum + diff*0.01 * rand(d,d)-0.5*ones(d,d);
-    %  sigmas(j,:,:) = sigmasum ./ temp;
-    end
-    count = count + 1;
-    %完了
-    %eta
-    %ws
-    %mus
-    %sigmas
-    %L = - LogLH(xs,ws,mus,sigmas);
-    %L
-    %diff = L - lastL;
-    %fprintf('count:%d  -> %10.5f\n',count,diff);
-    %pause;
-    %lastL = L;
+    temp1 = repmat(eta,[1,1,d]);%n,m,d
+    temp1 = permute(temp1,[3,2,1]);%
+    temp2 = repmat(xs,[1,1,m]);%d,n,m
+    temp2 = permute(temp2,[1,3,2]);%d,m,n
+    mus = sum((temp1.*temp2),3);%d,m
+    mus = mus ./ (repmat(temp,[1,d]))';
+    %分散共分散行列の計算
+    temp3 = repmat(xs,[1,1,m]);%d*n*m
+    temp3 = permute(temp3,[1,3,2]);%dmn
+    temp4 = repmat(mus,[1,1,n]);%d*m*n
+    temp5 = temp3 - temp4;%dmn
+    temp6 = repmat(temp5,[1,1,1,d]);%dmnd
+    temp6 = permute(temp6,[1,4,2,3]);%ddmn
+    temp7 = permute(temp6,[2,1,3,4]);%ddmn
+    temp8 = temp6 .* temp7;%d*d*m*n
+    temp10 = repmat(eta,[1,1,d,d]);%n*m*d*d
+    temp10 = permute(temp10,[3,4,2,1]);%d*d*m*n
+    sigmas = sum((temp8.*temp10),4);%d*d*m
+    temp11 = (repmat(temp,[1,d,d]));%m*d*d
+    temp11 = permute(temp11,[2,3,1]);%d*d*m
+    sigmas = sigmas ./ temp11;%d*d*m
   end
+  close(h1);
 end
 
-
-%データ列X,mu,sigmaを与えるとその正規分布における尤度を計算して返す
-function y = LogLH(xs,ws,mus,sigmas)
-  [n,d] = size(xs);
-  prod = 1;
-  for i = 1:n
-    ax = xs(i,:)';
-    prod = prod * q(ax,ws,mus,sigmas);
-  end
-  y = log(prod);
-end
-
-%モデルq
+%モデルqにおける確率を計算して返す関数
+%ax = d*1
+%mu = d*m
+%sigma = d*d*m
 function y = q(ax,ws,mus,sigmas)
   [m d] = size(mus);
   y=0;
   for j=1:m
-    y = y + ws(j) * N(ax,mus(j,:)',sigmas(j,:,:));
+    y = y + ws(j) * N(ax,mus(:,j),sigmas(:,:,j));
   end
 end
-%axは列ベクトル
+
+%正規分布の確率を返す関数
+%ax = d*1
+%mu = d*1
+%sigma = d*d
 function y = N(ax,mu,sigma)
   d = size(ax);
   d = d(1);
