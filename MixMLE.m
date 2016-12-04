@@ -32,8 +32,12 @@ function [ws,mus,sigmas] = MixMLE(xs,m,e)
     %Eステップ
     for i=1:n
       x = xs(:,i);
-      eta(i,:) = (ws .* mvnpdf(repmat(x,[1,m])',mus',sigmas))';
-      eta(i,:) = eta(i,:) ./ sum(eta(i,:),2);
+      temp = 0;
+      for j=1:m
+        eta(i,j) = ws(j) * N(x,mus(:,j),sigmas(:,:,j));
+        temp = temp + eta(i,j);
+      end
+      eta(i,:) = eta(i,:) ./ temp;
     end
     
     %収束判定
@@ -46,10 +50,18 @@ function [ws,mus,sigmas] = MixMLE(xs,m,e)
     if  drawfreq < count
       count = 0;
       x = -10:0.5:10;
-      y1(1,:) = (ws(1)*mvnpdf(x',mus(:,1)',sigmas(:,:,1)))';
-      y2(1,:) = (ws(2)*mvnpdf(x',mus(:,2)',sigmas(:,:,2)))';
-      y3(1,:) = (ws(3)*mvnpdf(x',mus(:,3)',sigmas(:,:,3)))';
-      y4(1,:) = y1(1,:) + y2(1,:) + y3(1,:);
+      xc = size(x);
+      xc = xc(2);
+      y1 = zeros(1,xc);
+      y2 = zeros(1,xc);
+      y3 = zeros(1,xc);
+      y4 = zeros(1,xc);
+      for xi = 1:xc
+        y1(1,xi) = ws(1)*N(x(:,xi),mus(:,1),sigmas(:,:,1));
+        y2(1,xi) = ws(2)*N(x(:,xi),mus(:,2),sigmas(:,:,2));
+        y3(1,xi) = ws(3)*N(x(:,xi),mus(:,3),sigmas(:,:,3));
+        y4(1,xi) = y1(1,xi) + y2(1,xi) +y3(1,xi);
+      end
       plot(x,y1,x,y2,x,y3,x,y4);
       title('計算過程')
       drawnow
@@ -83,4 +95,26 @@ function [ws,mus,sigmas] = MixMLE(xs,m,e)
     sigmas = sigmas ./ temp11;%d*d*m
   end
   close(h1);
+end
+
+%モデルqにおける確率を計算して返す関数
+%ax = d*1
+%mu = d*m
+%sigma = d*d*m
+function y = q(ax,ws,mus,sigmas)
+  [m d] = size(mus);
+  y=0;
+  for j=1:m
+    y = y + ws(j) * N(ax,mus(:,j),sigmas(:,:,j));
+  end
+end
+
+%正規分布の確率を返す関数
+%ax = d*1
+%mu = d*1
+%sigma = d*d
+function y = N(ax,mu,sigma)
+  d = size(ax);
+  d = d(1);
+  y= 1 / ( (2 * pi)^(d/2) * det(sigma)^(1/2)) * exp(-1/2 * (ax-mu)' * pinv(sigma) * (ax-mu));
 end
